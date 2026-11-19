@@ -20,18 +20,23 @@ All writing lives in `content/` as `.mdx` files with frontmatter:
 
 Categories: `the-self`, `the-human-condition`, `the-relationships`, `the-pursuit`, `the-inner-world`.
 
-## Admin panel (Keystatic)
+## Admin panel (`/admin`)
 
-**Locally:** run `npm run dev` and open `/keystatic`. Edits write straight to the `.mdx` files; commit them as usual.
+Write and edit from the browser: log in with one password, fill in the form, press **Simpan**.
+Each save becomes a commit on `main` (via the GitHub API) and Vercel redeploys in about a minute.
 
-**On the live site** (edit from the browser, saved as commits to GitHub):
+### One-time setup (2 variables)
 
-1. Locally, run `KEYSTATIC_STORAGE=github npm run dev` and open `http://localhost:3000/keystatic`.
-2. Follow the prompt to create a GitHub App. It writes four variables to `.env.local`:
-   `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`, `KEYSTATIC_SECRET`, `NEXT_PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`.
-3. Add those four variables in Vercel → Project → Settings → Environment Variables, then redeploy.
-4. In GitHub → Settings → Developer settings → GitHub Apps → your app, add the callback URL
-   `https://YOUR-DOMAIN/api/keystatic/github/oauth/callback`, and make sure the app is installed on this repository.
-5. Open `https://YOUR-DOMAIN/keystatic` and log in with GitHub. Each Save becomes a commit and Vercel redeploys.
+1. **Create a GitHub token** — github.com → Settings → Developer settings → Personal access tokens →
+   *Fine-grained tokens* → Generate new token.
+   Repository access: *Only select repositories* → `unfinishedhuman`.
+   Permissions → Repository permissions → **Contents: Read and write**.
+   Copy the token (`github_pat_...`).
+2. **Add to Vercel** — Project → Settings → Environment Variables:
+   - `ADMIN_PASSWORD` = a long password of your choice
+   - `GITHUB_TOKEN` = the token from step 1
+3. **Redeploy** (Deployments → ⋯ → Redeploy), then open `https://YOUR-DOMAIN/admin`.
+
+To try it locally, put the same two variables in `.env.local` and run `npm run dev`.
 
 Also set `NEXT_PUBLIC_SITE_URL` to your domain so RSS and the sitemap use the right address.

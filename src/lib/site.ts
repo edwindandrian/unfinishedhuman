@@ -5,6 +5,7 @@ export const site = {
     "A collection of thoughts, experiences, and reflections on what it means to be human.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://unfinishedhuman.com",
   author: "Edwin Andrian",
+  github: { owner: "edwindandrian", repo: "unfinishedhuman", branch: "main" },
 };
 
 export const nav = [
