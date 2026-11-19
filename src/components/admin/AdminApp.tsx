@@ -18,7 +18,7 @@ async function api<T = Record<string, unknown>>(url: string, init?: RequestInit)
 /** Shrink big photos before upload (keeps the repo light and stays under the request size limit). */
 async function prepareImage(file: File): Promise<Blob> {
   if (file.type === "image/gif") { if (file.size > 4_000_000) throw new Error("GIF terlalu besar (maks 4 MB)."); return file; }
-  const bmp = await createImageBitmap(file);
+  const bmp = await createImageBitmap(file).catch(() => { throw new Error("Browser tidak bisa membaca gambar ini (format HEIC/HEIF dari iPhone belum didukung). Ubah ke JPG atau PNG lalu coba lagi."); });
   const k = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
   const c = document.createElement("canvas");
   c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
@@ -45,6 +45,7 @@ export default function AdminApp() {
   const area = useRef<HTMLTextAreaElement>(null);
   const [tab, setTab] = useState<"write" | "preview">("write");
   const fileInput = useRef<HTMLInputElement>(null);
+  const cursorTouched = useRef(false);
   const localImages = useRef(new Map<string, string>());
   const [preview, setPreview] = useState<{ src?: MDXRemoteSerializeResult; error?: string; loading: boolean }>({ loading: false });
 
@@ -89,7 +90,7 @@ export default function AdminApp() {
       if (f.type === "select") data[f.name] = f.options![0].value;
       if (f.type === "list") data[f.name] = [];
     }
-    setTab("write"); setSlugTouched(false); setDirty(false); setMsg(null);
+    cursorTouched.current = false; setTab("write"); setSlugTouched(false); setDirty(false); setMsg(null);
     setEditing({ slug: "", isNew: true, data, content: "" });
   };
 
@@ -99,7 +100,7 @@ export default function AdminApp() {
     try {
       const r = await api<{ sha: string; data: Data; content: string }>(`/api/admin/entry?section=${section}&slug=${slug}`);
       setEditing({ slug, isNew: false, sha: r.sha, data: r.data, content: r.content });
-      setDirty(false); setTab("write");
+      setDirty(false); setTab("write"); cursorTouched.current = false;
     } catch (e) { setMsg({ type: "err", text: (e as Error).message }); }
     setBusy(false);
   };
@@ -165,13 +166,19 @@ export default function AdminApp() {
 
   const insertText = (text: string) => {
     const el = area.current; if (!el || !editing) return;
-    const a = el.selectionStart, b = el.selectionEnd;
+    // Insert where the cursor is; if the box was never clicked, add to the end instead of the very top.
+    const a = cursorTouched.current ? el.selectionStart : el.value.length;
+    const b = cursorTouched.current ? el.selectionEnd : el.value.length;
     setDirty(true); setEditing({ ...editing, content: el.value.slice(0, a) + text + el.value.slice(b) });
     requestAnimationFrame(() => { el.focus(); el.setSelectionRange(a + text.length, a + text.length); });
   };
 
+  const looksLikeImage = (f: File) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i.test(f.name);
+
   async function uploadImages(files: File[]) {
-    for (const f of files.filter((x) => x.type.startsWith("image/"))) {
+    const imgs = files.filter(looksLikeImage);
+    if (!imgs.length) { if (files.length) setMsg({ type: "err", text: "File yang dipilih bukan gambar. Gunakan JPG, PNG, WebP, atau GIF." }); return; }
+    for (const f of imgs) {
       setMsg({ type: "ok", text: `Mengunggah ${f.name || "gambar"}…` });
       try {
         const blob = await prepareImage(f);
@@ -218,6 +225,12 @@ export default function AdminApp() {
 
   return (
     <div className="min-h-screen">
+      {msg && (
+        <div role="status" aria-live="polite" className={`fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-xl items-start gap-4 border bg-paper px-4 py-3 text-sm shadow-lg ${msg.type === "ok" ? "border-green-700/50 text-green-800 dark:text-green-300" : "border-red-700/50 text-red-800 dark:text-red-300"}`}>
+          <span className="flex-1">{msg.text}</span>
+          <button type="button" onClick={() => setMsg(null)} aria-label="Tutup pesan" className="text-muted hover:text-ink">✕</button>
+        </div>
+      )}
       <header className="border-b border-rule">
         <div className="container-wide flex h-16 items-center justify-between">
           <span className="font-serif text-xl font-medium">Unfinished Human <span className="eyebrow ml-2">Admin</span></span>
@@ -235,7 +248,7 @@ export default function AdminApp() {
           ))}
         </nav>
 
-        {msg && <p role="status" className={`mt-6 border px-4 py-3 text-sm ${msg.type === "ok" ? "border-green-700/40 text-green-800 dark:text-green-300" : "border-red-700/40 text-red-800 dark:text-red-300"}`}>{msg.text}</p>}
+
 
         <div className="mt-8 grid gap-10 md:grid-cols-[280px_1fr]">
           <aside>
@@ -280,7 +293,7 @@ export default function AdminApp() {
                     </div>
                   </div>
 
-                  <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={(e) => { uploadImages([...(e.target.files ?? [])]); e.target.value = ""; }} />
+                  <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => { uploadImages([...(e.target.files ?? [])]); e.target.value = ""; }} />
                   {tab === "write" ? (
                     <>
                       <div className="flex flex-wrap gap-1 border border-b-0 border-rule p-1.5">
@@ -289,9 +302,9 @@ export default function AdminApp() {
                         ))}
                         <span className="ml-auto self-center pr-2 text-xs text-muted">Markdown · [[Judul]] menautkan catatan · tempel atau seret gambar ke sini</span>
                       </div>
-                      <textarea ref={area} rows={22} value={editing.content}
-                        onPaste={(e) => { const imgs = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/")); if (imgs.length) { e.preventDefault(); uploadImages(imgs); } }}
-                        onDrop={(e) => { const imgs = [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/")); if (imgs.length) { e.preventDefault(); uploadImages(imgs); } }} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }}
+                      <textarea ref={area} rows={22} value={editing.content} onFocus={() => { cursorTouched.current = true; }}
+                        onPaste={(e) => { const imgs = [...e.clipboardData.files].filter(looksLikeImage); if (imgs.length) { e.preventDefault(); uploadImages(imgs); } }}
+                        onDrop={(e) => { const imgs = [...e.dataTransfer.files].filter(looksLikeImage); if (imgs.length) { e.preventDefault(); uploadImages(imgs); } }} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }}
                         className={`${input} font-mono text-[0.9rem] leading-relaxed`} placeholder="Mulai menulis di sini…" />
                     </>
                   ) : (
