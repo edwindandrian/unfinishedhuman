@@ -24,6 +24,16 @@ const related: Field = { name: "related", label: "Essay terkait", type: "list", 
 
 export const sections = {
   essays: { label: "Essays", singular: "essay", fields: [title, date, category, excerpt(), { name: "featured", label: "Tampilkan sebagai unggulan di beranda", type: "checkbox" }, related] as Field[] },
+  garden: {
+    label: "Garden", singular: "catatan",
+    fields: [
+      title,
+      { name: "date", label: "Ditanam (tanggal)", type: "date", required: true },
+      { name: "status", label: "Tahap tumbuh", type: "select", required: true, options: [{ value: "seedling", label: "○ Seedling (kasar, baru)" }, { value: "growing", label: "◐ Growing (mulai terbentuk)" }, { value: "evergreen", label: "● Evergreen (sudah mantap)" }] },
+      { name: "tags", label: "Tag", type: "list", hint: "Pisahkan dengan koma, mis. inner-world, practice. Tanpa tanda #." },
+      { name: "excerpt", label: "Ringkasan (opsional)", type: "textarea", hint: "Kosongkan saja, nanti diambil otomatis dari awal catatan." },
+    ] as Field[],
+  },
   fragments: { label: "Fragments", singular: "fragment", fields: [title, date, category, excerpt("Kutipan singkat", "Kalimat yang tampil di daftar fragments.")] as Field[] },
   "reading-room": { label: "Reading Room", singular: "buku", fields: [title, { name: "author", label: "Penulis buku", type: "text", required: true }, { name: "year", label: "Tahun terbit", type: "number" }, { name: "rating", label: "Rating (1–5)", type: "number", min: 1, max: 5 }, date, category, excerpt(), related] as Field[] },
   "field-notes": { label: "Field Notes", singular: "catatan", fields: [title, date, { name: "place", label: "Tempat", type: "text" }, excerpt()] as Field[] },

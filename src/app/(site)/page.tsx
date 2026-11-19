@@ -9,6 +9,7 @@ export default function Home() {
   const featured = essays.filter((e) => e.featured).slice(0, 3);
   const latest = essays.slice(0, 4);
   const fragments = getAll("fragments").slice(0, 4);
+  const garden = getAll("garden").slice(0, 4);
   const books = getAll("reading-room").slice(0, 3);
   const note = getAll("field-notes")[0];
 
@@ -85,6 +86,30 @@ export default function Home() {
           <Link href="/essays" className="eyebrow link-line">Archive →</Link>
         </div>
         <div className="border-b border-rule">{latest.map((e, i) => <EntryRow key={e.slug} e={e} n={i + 1} />)}</div>
+      </section>
+
+      {/* Garden */}
+      <section className="container-wide mt-28">
+        <div className="grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-4">
+            <h2 className="eyebrow text-ink">The Garden</h2>
+            <p className="mt-6 font-serif text-3xl font-light leading-snug">Small notes, linked to one another. Some are seedlings; some have been growing for years.</p>
+            <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3">
+              <Link href="/garden" className="eyebrow link-line text-ink">Visit the garden →</Link>
+              <Link href="/garden/graph" className="eyebrow link-line text-ink">See the graph →</Link>
+            </div>
+          </div>
+          <ul className="border-t border-rule md:col-span-8">
+            {garden.map((n) => (
+              <li key={n.slug} className="border-b border-rule">
+                <Link href={n.href} className="group flex items-baseline justify-between gap-6 py-5">
+                  <span className="font-serif text-2xl transition-colors group-hover:text-accent">{n.title}</span>
+                  <span className="eyebrow whitespace-nowrap">{n.status === "evergreen" ? "● Evergreen" : n.status === "growing" ? "◐ Growing" : "○ Seedling"}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       {/* Fragments */}

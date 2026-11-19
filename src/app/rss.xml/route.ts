@@ -5,7 +5,7 @@ export const dynamic = "force-static";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export function GET() {
-  const items = [...getAll("essays"), ...getAll("fragments"), ...getAll("field-notes"), ...getAll("reading-room")]
+  const items = [...getAll("essays"), ...getAll("fragments"), ...getAll("garden"), ...getAll("field-notes"), ...getAll("reading-room")]
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>

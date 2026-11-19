@@ -14,11 +14,17 @@ All writing lives in `content/` as `.mdx` files with frontmatter:
 | Folder | Fields |
 | --- | --- |
 | `essays/` | title, date, category, excerpt, featured, related |
+| `garden/` | title, date, status (`seedling`/`growing`/`evergreen`), tags |
 | `fragments/` | title, date, category, excerpt |
 | `reading-room/` | title, author, year, rating, date, category, excerpt, related |
 | `field-notes/` | title, date, place, excerpt |
 
 Categories: `the-self`, `the-human-condition`, `the-relationships`, `the-pursuit`, `the-inner-world`.
+
+## Garden
+
+Notes in `content/garden/` link to each other with `[[Note title]]` or `[[slug|custom label]]`.
+Links also resolve to essay titles. Backlinks, tags, and the graph (`/garden/graph`) are built automatically.
 
 ## Admin panel (`/admin`)
 

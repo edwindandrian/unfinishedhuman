@@ -35,10 +35,10 @@ export default function Header({ index }: { index: SearchItem[] }) {
           {site.name}
         </Link>
 
-        <nav aria-label="Primary" className="hidden items-center gap-8 md:flex">
+        <nav aria-label="Primary" className="hidden items-center gap-5 md:flex lg:gap-8">
           {nav.map((n) => (
             <Link key={n.href} href={n.href} aria-current={active(n.href) ? "page" : undefined}
-              className={`link-line pb-0.5 text-[0.8rem] uppercase tracking-[0.16em] ${active(n.href) ? "text-ink" : "text-muted hover:text-ink"}`}
+              className={`link-line pb-0.5 text-[0.72rem] uppercase tracking-[0.14em] lg:text-[0.8rem] lg:tracking-[0.16em] ${active(n.href) ? "text-ink" : "text-muted hover:text-ink"}`}
               style={active(n.href) ? { backgroundSize: "100% 1px" } : undefined}>
               {n.label}
             </Link>

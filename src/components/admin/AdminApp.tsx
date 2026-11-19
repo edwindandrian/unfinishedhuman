@@ -136,6 +136,7 @@ export default function AdminApp() {
     ["Kutipan", "❝", () => linePrefix("> ")],
     ["Daftar", "•", () => linePrefix("- ")],
     ["Tautan", "🔗", () => format("[", "](https://)", "teks tautan")],
+    ["Tautan ke catatan/essay lain (wikilink)", "[[ ]]", () => format("[[", "]]", "Judul catatan")],
   ];
 
   const renderField = (f: Field) => {
@@ -214,7 +215,7 @@ export default function AdminApp() {
                     {tools.map(([title, label, fn]) => (
                       <button type="button" key={title} title={title} aria-label={title} onClick={fn} className="min-w-9 px-2 py-1 text-sm text-muted transition-colors hover:bg-ink/5 hover:text-ink">{label}</button>
                     ))}
-                    <span className="ml-auto self-center pr-2 text-xs text-muted">Format Markdown</span>
+                    <span className="ml-auto self-center pr-2 text-xs text-muted">Markdown · [[Judul]] untuk menautkan catatan</span>
                   </div>
                   <textarea ref={area} rows={22} value={editing.content} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }}
                     className={`${input} font-mono text-[0.9rem] leading-relaxed`} placeholder="Mulai menulis di sini…" />

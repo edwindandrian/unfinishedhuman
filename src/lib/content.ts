@@ -3,7 +3,7 @@ import path from "node:path";
 import matter from "gray-matter";
 import readingTime from "reading-time";
 
-export type Section = "essays" | "fragments" | "reading-room" | "field-notes";
+export type Section = "essays" | "fragments" | "garden" | "reading-room" | "field-notes";
 
 export interface Entry {
   section: Section;
@@ -23,11 +23,26 @@ export interface Entry {
   related: string[];
   // field notes
   place?: string;
+  // garden
+  status?: string;
+  tags: string[];
 }
 
 const ROOT = path.join(process.cwd(), "content");
 
+const cache = new Map<Section, Entry[]>();
+const plain = (md: string) =>
+  md.replace(/\[\[(?:[^\]|]+\|)?([^\]]+)\]\]/g, "$1").replace(/[#>*_`\-]|\[|\]\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+
 function load(section: Section): Entry[] {
+  const hit = process.env.NODE_ENV === "production" && cache.get(section);
+  if (hit) return hit;
+  const result = read(section);
+  cache.set(section, result);
+  return result;
+}
+
+function read(section: Section): Entry[] {
   const dir = path.join(ROOT, section);
   if (!fs.existsSync(dir)) return [];
   return fs
@@ -44,7 +59,7 @@ function load(section: Section): Entry[] {
         href: `/${section}/${slug}`,
         title: String(data.title),
         date,
-        excerpt: String(data.excerpt ?? ""),
+        excerpt: String(data.excerpt ?? "") || plain(content).slice(0, 160),
         category: data.category,
         featured: Boolean(data.featured),
         minutes: Math.max(1, Math.round(readingTime(content).minutes)),
@@ -54,6 +69,8 @@ function load(section: Section): Entry[] {
         year: data.year,
         related: (data.related as string[] | undefined) ?? [],
         place: data.place,
+        status: data.status,
+        tags: ((data.tags as string[] | undefined) ?? []).map(String),
       } satisfies Entry;
     })
     .sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -85,12 +102,13 @@ export interface SearchItem {
 const typeLabel: Record<Section, string> = {
   essays: "Essay",
   fragments: "Fragment",
+  garden: "Garden",
   "reading-room": "Book",
   "field-notes": "Field note",
 };
 
 export function searchIndex(): SearchItem[] {
-  return (["essays", "fragments", "reading-room", "field-notes"] as Section[]).flatMap((s) =>
+  return (["essays", "fragments", "garden", "reading-room", "field-notes"] as Section[]).flatMap((s) =>
     load(s).map((e) => ({
       title: e.title,
       href: e.href,
