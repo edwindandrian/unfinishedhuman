@@ -43,6 +43,10 @@ Each save becomes a commit on `main` (via the GitHub API) and Vercel redeploys i
    - `GITHUB_TOKEN` = the token from step 1
 3. **Redeploy** (Deployments → ⋯ → Redeploy), then open `https://YOUR-DOMAIN/admin`.
 
+**Images:** in the editor, use the 🖼 button, or paste / drag an image into the text box. It is resized
+(max 1800px, WebP), committed to `public/images/uploads/`, and inserted as `![caption](/images/uploads/...)`.
+The text in the brackets becomes the caption under the photo.
+
 To try it locally, put the same two variables in `.env.local` and run `npm run dev`.
 
 Also set `NEXT_PUBLIC_SITE_URL` to your domain so RSS and the sitemap use the right address.

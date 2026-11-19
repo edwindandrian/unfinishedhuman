@@ -54,3 +54,12 @@ export async function writeFile(section: string, slug: string, text: string, sha
 export async function removeFile(section: string, slug: string, sha: string, message: string) {
   await gh(`contents/${filePath(section, slug)}`, { method: "DELETE", body: JSON.stringify({ message, sha, branch }) });
 }
+
+/** Create a binary file (e.g. an image). Re-uploading identical content is treated as success. */
+export async function putBinary(path: string, base64: string, message: string) {
+  try {
+    await gh(`contents/${path}`, { method: "PUT", body: JSON.stringify({ message, content: base64, branch }) });
+  } catch (e) {
+    if (!(e instanceof GhError && e.status === 422)) throw e; // 422 = already exists (same hash name)
+  }
+}

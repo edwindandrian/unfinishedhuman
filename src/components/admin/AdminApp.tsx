@@ -15,6 +15,22 @@ async function api<T = Record<string, unknown>>(url: string, init?: RequestInit)
   return body as T;
 }
 
+/** Shrink big photos before upload (keeps the repo light and stays under the request size limit). */
+async function prepareImage(file: File): Promise<Blob> {
+  if (file.type === "image/gif") { if (file.size > 4_000_000) throw new Error("GIF terlalu besar (maks 4 MB)."); return file; }
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+  const toBlob = (type: string, q: number) => new Promise<Blob | null>((r) => c.toBlob(r, type, q));
+  let out = await toBlob("image/webp", 0.85);
+  if (!out || out.type !== "image/webp") out = await toBlob("image/jpeg", 0.88);
+  if (!out) throw new Error("Gambar tidak bisa diproses.");
+  if (out.size > 4_000_000) throw new Error("Gambar masih terlalu besar setelah dikecilkan.");
+  return out;
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 const input = "w-full border border-rule bg-transparent px-3 py-2 text-[0.95rem] outline-none transition-colors focus:border-ink";
 
@@ -28,6 +44,8 @@ export default function AdminApp() {
   const [slugTouched, setSlugTouched] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const [tab, setTab] = useState<"write" | "preview">("write");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const localImages = useRef(new Map<string, string>());
   const [preview, setPreview] = useState<{ src?: MDXRemoteSerializeResult; error?: string; loading: boolean }>({ loading: false });
 
   const body = editing?.content;
@@ -145,7 +163,33 @@ export default function AdminApp() {
     requestAnimationFrame(() => el.focus());
   };
 
+  const insertText = (text: string) => {
+    const el = area.current; if (!el || !editing) return;
+    const a = el.selectionStart, b = el.selectionEnd;
+    setDirty(true); setEditing({ ...editing, content: el.value.slice(0, a) + text + el.value.slice(b) });
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(a + text.length, a + text.length); });
+  };
+
+  async function uploadImages(files: File[]) {
+    for (const f of files.filter((x) => x.type.startsWith("image/"))) {
+      setMsg({ type: "ok", text: `Mengunggah ${f.name || "gambar"}…` });
+      try {
+        const blob = await prepareImage(f);
+        const fd = new FormData();
+        fd.append("file", blob, f.name || "image");
+        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+        const json = await res.json().catch(() => ({}));
+        if (res.status === 401) return location.reload();
+        if (!res.ok) throw new Error(json.error ?? "Gagal mengunggah gambar.");
+        localImages.current.set(json.url, URL.createObjectURL(blob));
+        insertText(`\n\n![deskripsi gambar](${json.url})\n\n`);
+        setMsg({ type: "ok", text: "Gambar terunggah ke GitHub dan disisipkan. Ganti teks \"deskripsi gambar\" (jadi keterangan di bawah foto), lalu Simpan. Gambar tampil di situs setelah deploy ±1 menit." });
+      } catch (e) { setMsg({ type: "err", text: (e as Error).message }); }
+    }
+  }
+
   const tools: [string, string, () => void][] = [
+    ["Sisipkan gambar", "🖼", () => fileInput.current?.click()],
     ["Judul bagian", "H2", () => linePrefix("## ")],
     ["Tebal", "B", () => format("**", "**")],
     ["Miring", "I", () => format("*", "*")],
@@ -236,15 +280,18 @@ export default function AdminApp() {
                     </div>
                   </div>
 
+                  <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={(e) => { uploadImages([...(e.target.files ?? [])]); e.target.value = ""; }} />
                   {tab === "write" ? (
                     <>
                       <div className="flex flex-wrap gap-1 border border-b-0 border-rule p-1.5">
                         {tools.map(([title, label, fn]) => (
                           <button type="button" key={title} title={title} aria-label={title} onClick={fn} className="min-w-9 px-2 py-1 text-sm text-muted transition-colors hover:bg-ink/5 hover:text-ink">{label}</button>
                         ))}
-                        <span className="ml-auto self-center pr-2 text-xs text-muted">Markdown · [[Judul]] untuk menautkan catatan</span>
+                        <span className="ml-auto self-center pr-2 text-xs text-muted">Markdown · [[Judul]] menautkan catatan · tempel atau seret gambar ke sini</span>
                       </div>
-                      <textarea ref={area} rows={22} value={editing.content} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }}
+                      <textarea ref={area} rows={22} value={editing.content}
+                        onPaste={(e) => { const imgs = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/")); if (imgs.length) { e.preventDefault(); uploadImages(imgs); } }}
+                        onDrop={(e) => { const imgs = [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/")); if (imgs.length) { e.preventDefault(); uploadImages(imgs); } }} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }}
                         className={`${input} font-mono text-[0.9rem] leading-relaxed`} placeholder="Mulai menulis di sini…" />
                     </>
                   ) : (
@@ -255,7 +302,10 @@ export default function AdminApp() {
                         <p role="alert" className="border border-red-700/40 px-4 py-3 text-sm text-red-800 dark:text-red-300">{preview.error}</p>
                       ) : preview.src ? (
                         <div className={`prose-journal ${section === "essays" || section === "field-notes" ? "" : "no-dropcap"} ${preview.loading ? "opacity-60" : ""}`}>
-                          <MDXRemote {...preview.src} components={{ a: (p: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...p} target="_blank" rel="noreferrer" /> }} />
+                          <MDXRemote {...preview.src} components={{
+                            a: (p: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...p} target="_blank" rel="noreferrer" />,
+                            img: (p: { src?: string | Blob; alt?: string }) => { const src = typeof p.src === "string" ? (localImages.current.get(p.src) ?? p.src) : undefined; return <span className="figure"><img src={src} alt={p.alt ?? ""} />{p.alt && <span className="figcaption">{p.alt}</span>}</span>; },
+                          }} />
                         </div>
                       ) : <p className="text-sm text-muted">Membuat pratinjau…</p>}
                     </div>
