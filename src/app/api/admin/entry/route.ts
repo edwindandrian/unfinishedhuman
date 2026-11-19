@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { guard, fail, bad, parse, cleanData, serialize } from "@/lib/admin-api";
+import { guard, fail, bad, parse, cleanData, serialize, compileBody } from "@/lib/admin-api";
+import { escapeMdx } from "@/lib/mdx";
 import { isSection } from "@/lib/admin-schema";
 import { readFile, writeFile, removeFile } from "@/lib/github";
 
@@ -24,6 +25,7 @@ export async function PUT(req: Request) {
   if (typeof content !== "string" || !content.trim()) return bad("Isi tulisan tidak boleh kosong.");
   try {
     const clean = cleanData(section, data ?? {});
+    await compileBody(escapeMdx(content));
     const message = `${isNew ? "Add" : "Update"} ${section}/${slug} via admin`;
     const newSha = await writeFile(section, slug, serialize(clean, content), isNew ? undefined : sha, message);
     return NextResponse.json({ sha: newSha });

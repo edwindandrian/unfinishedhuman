@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MDXRemote, type MDXRemoteSerializeResult } from "next-mdx-remote";
 import { sections, sectionKeys, slugify, type Field, type SectionKey } from "@/lib/admin-schema";
 
 type Data = Record<string, unknown>;
@@ -26,6 +27,21 @@ export default function AdminApp() {
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [slugTouched, setSlugTouched] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
+  const [tab, setTab] = useState<"write" | "preview">("write");
+  const [preview, setPreview] = useState<{ src?: MDXRemoteSerializeResult; error?: string; loading: boolean }>({ loading: false });
+
+  const body = editing?.content;
+  useEffect(() => {
+    if (tab !== "preview" || body == null) return;
+    setPreview((p) => ({ ...p, loading: true }));
+    const t = setTimeout(async () => {
+      const res = await fetch("/api/admin/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: body }) });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 401) return location.reload();
+      setPreview(res.ok ? { src: json, loading: false } : { error: json.error ?? "Gagal membuat pratinjau.", loading: false });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [tab, body]);
 
   const loadList = useCallback(async (s: SectionKey) => {
     setItems(null);
@@ -55,7 +71,7 @@ export default function AdminApp() {
       if (f.type === "select") data[f.name] = f.options![0].value;
       if (f.type === "list") data[f.name] = [];
     }
-    setSlugTouched(false); setDirty(false); setMsg(null);
+    setTab("write"); setSlugTouched(false); setDirty(false); setMsg(null);
     setEditing({ slug: "", isNew: true, data, content: "" });
   };
 
@@ -65,7 +81,7 @@ export default function AdminApp() {
     try {
       const r = await api<{ sha: string; data: Data; content: string }>(`/api/admin/entry?section=${section}&slug=${slug}`);
       setEditing({ slug, isNew: false, sha: r.sha, data: r.data, content: r.content });
-      setDirty(false);
+      setDirty(false); setTab("write");
     } catch (e) { setMsg({ type: "err", text: (e as Error).message }); }
     setBusy(false);
   };
@@ -210,15 +226,40 @@ export default function AdminApp() {
                 </div>
 
                 <div>
-                  <p className="eyebrow mb-1.5">Isi tulisan *</p>
-                  <div className="flex flex-wrap gap-1 border border-b-0 border-rule p-1.5">
-                    {tools.map(([title, label, fn]) => (
-                      <button type="button" key={title} title={title} aria-label={title} onClick={fn} className="min-w-9 px-2 py-1 text-sm text-muted transition-colors hover:bg-ink/5 hover:text-ink">{label}</button>
-                    ))}
-                    <span className="ml-auto self-center pr-2 text-xs text-muted">Markdown · [[Judul]] untuk menautkan catatan</span>
+                  <div className="mb-2 flex items-end justify-between">
+                    <p className="eyebrow">Isi tulisan *</p>
+                    <div role="tablist" aria-label="Mode isi tulisan" className="flex gap-5">
+                      {(["write", "preview"] as const).map((t) => (
+                        <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                          className={`border-b pb-0.5 text-[0.72rem] uppercase tracking-[0.16em] ${tab === t ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"}`}>{t === "write" ? "Tulis" : "Pratinjau"}</button>
+                      ))}
+                    </div>
                   </div>
-                  <textarea ref={area} rows={22} value={editing.content} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }}
-                    className={`${input} font-mono text-[0.9rem] leading-relaxed`} placeholder="Mulai menulis di sini…" />
+
+                  {tab === "write" ? (
+                    <>
+                      <div className="flex flex-wrap gap-1 border border-b-0 border-rule p-1.5">
+                        {tools.map(([title, label, fn]) => (
+                          <button type="button" key={title} title={title} aria-label={title} onClick={fn} className="min-w-9 px-2 py-1 text-sm text-muted transition-colors hover:bg-ink/5 hover:text-ink">{label}</button>
+                        ))}
+                        <span className="ml-auto self-center pr-2 text-xs text-muted">Markdown · [[Judul]] untuk menautkan catatan</span>
+                      </div>
+                      <textarea ref={area} rows={22} value={editing.content} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }}
+                        className={`${input} font-mono text-[0.9rem] leading-relaxed`} placeholder="Mulai menulis di sini…" />
+                    </>
+                  ) : (
+                    <div className="min-h-[28rem] border border-rule px-6 py-10 md:px-12" aria-live="polite">
+                      <p className="eyebrow mb-6 text-center">Pratinjau · tampilan kira-kira seperti di situs</p>
+                      <h2 className="display mb-10 text-center text-4xl md:text-5xl">{String(editing.data.title || "Tanpa judul")}</h2>
+                      {preview.error ? (
+                        <p role="alert" className="border border-red-700/40 px-4 py-3 text-sm text-red-800 dark:text-red-300">{preview.error}</p>
+                      ) : preview.src ? (
+                        <div className={`prose-journal ${section === "essays" || section === "field-notes" ? "" : "no-dropcap"} ${preview.loading ? "opacity-60" : ""}`}>
+                          <MDXRemote {...preview.src} components={{ a: (p: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...p} target="_blank" rel="noreferrer" /> }} />
+                        </div>
+                      ) : <p className="text-sm text-muted">Membuat pratinjau…</p>}
+                    </div>
+                  )}
                 </div>
 
                 <div className="sticky bottom-0 -mx-1 flex items-center gap-6 border-t border-rule bg-paper/95 px-1 py-4 backdrop-blur">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { escapeMdx } from "@/lib/mdx";
 
 const components = {
   a: ({ href = "", children }: { href?: string; children?: React.ReactNode }) =>
@@ -9,7 +10,7 @@ const components = {
 export default function Mdx({ source, dropcap = true }: { source: string; dropcap?: boolean }) {
   return (
     <div className={`prose-journal ${dropcap ? "" : "no-dropcap"}`}>
-      <MDXRemote source={source} components={components} />
+      <MDXRemote source={escapeMdx(source)} components={components} />
     </div>
   );
 }
